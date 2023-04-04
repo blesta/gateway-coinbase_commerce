@@ -24,7 +24,7 @@ class CoinbaseCommerce extends NonmerchantGateway
     public function __construct()
     {
         // Load the Coinbase Commerce API
-        Loader::load(dirname(__FILE__) . DS . 'lin' . DS . 'coinbase_commerce_api.php');
+        Loader::load(dirname(__FILE__) . DS . 'lib' . DS . 'coinbase_commerce_api.php');
 
         // Load configuration required by this gateway
         $this->loadConfig(dirname(__FILE__) . DS . 'config.json');
@@ -56,7 +56,9 @@ class CoinbaseCommerce extends NonmerchantGateway
     {
         // Load the view into this object, so helpers can be automatically add to the view
         $this->view = new View('settings', 'default');
-        $this->view->setDefaultView('components' . DS . 'gateways' . DS . 'nonmerchant' . DS . 'coinbase_commerce' . DS);
+        $this->view->setDefaultView(
+            'components' . DS . 'gateways' . DS . 'nonmerchant' . DS . 'coinbase_commerce' . DS
+        );
 
         // Load the helpers required for this view
         Loader::loadHelpers($this, ['Form', 'Html']);
@@ -400,11 +402,7 @@ class CoinbaseCommerce extends NonmerchantGateway
      */
     private function getApi()
     {
-        Loader::load(dirname(__FILE__) . DS . 'lib' . DS . 'coinbase_commerce_api.php');
-
-        return new CoinbaseCommerceApi(
-            $this->meta['api_key']
-        );
+        return new CoinbaseCommerceApi($this->meta['api_key']);
     }
 
     /**

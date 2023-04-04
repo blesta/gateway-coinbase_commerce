@@ -16,7 +16,7 @@ your Blesta installation path.
     For example:
 
     ```
-    /var/www/html/blesta/plugins/coinbase_commerce/
+    /var/www/html/blesta/components/gateways/nonmerchant/coinbase_commerce/
     ```
 
 3. Log in to your admin Blesta account and navigate to
