@@ -329,32 +329,46 @@ class CoinbaseCommerce extends NonmerchantGateway
     {
         // Initialize API
         $api = $this->getApi();
-        $charges = new CoinbaseCommerceCharges($api);
+        $amount = null;
+        $currency = null;
 
         // Fetch the current payment on session
         Loader::loadComponents($this, ['Session']);
         $charge_id = $this->Session->read('blesta_coinbase_id');
 
+        $statuses = [
+            'new' => 'pending',
+            'pending' => 'pending',
+            'unresolved' => 'pending',
+            'resolved' => 'approved',
+            'completed' => 'approved',
+            'pending_refund' => 'approved',
+            'expired' => 'error',
+            'canceled' => 'void',
+            'refunded' => 'refunded',
+        ];
+        $status = 'pending';
         if (!empty($charge_id)) {
+            $charges = new CoinbaseCommerceCharges($api);
             $charge = $charges->get(['id' => $charge_id])->response();
+
+            // Calculate amount
+            if (isset($charge->data->payments)) {
+                foreach ($charge->data->payments as $payment) {
+                    $amount = $amount + ($payment->value->local->amount ?? 0);
+                    $currency = $payment->value->local->currency ?? null;
+                }
+            }
+            $status = $statuses[strtolower(array_pop($charge->data->timeline)->status ?? 'pending')] ?? 'pending';
         }
 
-        // Calculate amount
-        $amount = null;
-        $currency = null;
-        if (isset($charge->data->payments)) {
-            foreach ($charge->data->payments as $payment) {
-                $amount = $amount + ($payment->value->local->amount ?? 0);
-                $currency = $payment->value->local->currency ?? null;
-            }
-        }
 
         return [
             'client_id' => ($charge->data->metadata->customer_id ?? null),
             'amount' => $amount,
             'currency' => $currency,
             'invoices' => $this->unserializeInvoices($charge->data->metadata->invoices ?? null),
-            'status' => 'declined',
+            'status' => $status,
             'transaction_id' => $charge_id,
             'parent_transaction_id' => null
         ];
