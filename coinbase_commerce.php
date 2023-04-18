@@ -24,7 +24,7 @@ class CoinbaseCommerce extends NonmerchantGateway
     public function __construct()
     {
         // Load the Coinbase Commerce API
-        Loader::load(dirname(__FILE__) . DS . 'lin' . DS . 'coinbase_commerce_api.php');
+        Loader::load(dirname(__FILE__) . DS . 'lib' . DS . 'coinbase_commerce_api.php');
 
         // Load configuration required by this gateway
         $this->loadConfig(dirname(__FILE__) . DS . 'config.json');
@@ -56,7 +56,9 @@ class CoinbaseCommerce extends NonmerchantGateway
     {
         // Load the view into this object, so helpers can be automatically add to the view
         $this->view = new View('settings', 'default');
-        $this->view->setDefaultView('components' . DS . 'gateways' . DS . 'nonmerchant' . DS . 'coinbase_commerce' . DS);
+        $this->view->setDefaultView(
+            'components' . DS . 'gateways' . DS . 'nonmerchant' . DS . 'coinbase_commerce' . DS
+        );
 
         // Load the helpers required for this view
         Loader::loadHelpers($this, ['Form', 'Html']);
@@ -327,32 +329,46 @@ class CoinbaseCommerce extends NonmerchantGateway
     {
         // Initialize API
         $api = $this->getApi();
-        $charges = new CoinbaseCommerceCharges($api);
+        $amount = null;
+        $currency = null;
 
         // Fetch the current payment on session
         Loader::loadComponents($this, ['Session']);
         $charge_id = $this->Session->read('blesta_coinbase_id');
 
+        $statuses = [
+            'new' => 'pending',
+            'pending' => 'pending',
+            'unresolved' => 'pending',
+            'resolved' => 'approved',
+            'completed' => 'approved',
+            'pending_refund' => 'approved',
+            'expired' => 'error',
+            'canceled' => 'void',
+            'refunded' => 'refunded',
+        ];
+        $status = 'pending';
         if (!empty($charge_id)) {
+            $charges = new CoinbaseCommerceCharges($api);
             $charge = $charges->get(['id' => $charge_id])->response();
+
+            // Calculate amount
+            if (isset($charge->data->payments)) {
+                foreach ($charge->data->payments as $payment) {
+                    $amount = $amount + ($payment->value->local->amount ?? 0);
+                    $currency = $payment->value->local->currency ?? null;
+                }
+            }
+            $status = $statuses[strtolower(array_pop($charge->data->timeline)->status ?? 'pending')] ?? 'pending';
         }
 
-        // Calculate amount
-        $amount = null;
-        $currency = null;
-        if (isset($charge->data->payments)) {
-            foreach ($charge->data->payments as $payment) {
-                $amount = $amount + ($payment->value->local->amount ?? 0);
-                $currency = $payment->value->local->currency ?? null;
-            }
-        }
 
         return [
             'client_id' => ($charge->data->metadata->customer_id ?? null),
             'amount' => $amount,
             'currency' => $currency,
             'invoices' => $this->unserializeInvoices($charge->data->metadata->invoices ?? null),
-            'status' => 'declined',
+            'status' => $status,
             'transaction_id' => $charge_id,
             'parent_transaction_id' => null
         ];
@@ -400,11 +416,7 @@ class CoinbaseCommerce extends NonmerchantGateway
      */
     private function getApi()
     {
-        Loader::load(dirname(__FILE__) . DS . 'lib' . DS . 'coinbase_commerce_api.php');
-
-        return new CoinbaseCommerceApi(
-            $this->meta['api_key']
-        );
+        return new CoinbaseCommerceApi($this->meta['api_key']);
     }
 
     /**
