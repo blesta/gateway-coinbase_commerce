@@ -273,19 +273,38 @@ class CoinbaseCommerce extends NonmerchantGateway
 
         // Validate response
         $status = 'error';
-        $amount = 0;
+        $amount = null;
         $currency = null;
 
         if (isset($charge->data->payments)) {
             foreach ($charge->data->payments as $payment) {
-                $amount = $amount + ($payment->value->local->amount ?? 0);
-                $currency = $payment->value->local->currency ?? null;
+                if (is_null($amount)) {
+                    $amount = 0;
+                }
+
+                $amount = $amount + ($payment->value->local->amount ?? $payment->net->local->amount ?? 0);
+                $currency = $payment->value->local->currency ?? $payment->net->local->currency ?? null;
             }
 
-            if ($amount > 0 && !is_null($currency)) {
+            if (is_null($amount) && isset($charge->data->pricing->local)) {
+                $amount = $charge->data->pricing->local->amount ?? null;
+            }
+
+            if (is_null($currency) && isset($charge->data->pricing->local)) {
+                $currency = $charge->data->pricing->local->currency ?? null;
+            }
+
+            if (is_null($currency) || is_null($amount)) {
+                return null;
+            }
+
+            // Get payment status
+            $last_timeline = end($charge->data->timeline);
+            reset($charge->data->timeline);
+            $status = $statuses[strtolower($last_timeline->status ?? 'PENDING')] ?? $status;
+
+            if ($amount > 0 && $status == 'error') {
                 $status = 'approved';
-            } else {
-                $status = 'declined';
             }
         }
 
@@ -355,13 +374,34 @@ class CoinbaseCommerce extends NonmerchantGateway
             // Calculate amount
             if (isset($charge->data->payments)) {
                 foreach ($charge->data->payments as $payment) {
-                    $amount = $amount + ($payment->value->local->amount ?? 0);
-                    $currency = $payment->value->local->currency ?? null;
+                    if (is_null($amount)) {
+                        $amount = 0;
+                    }
+
+                    $amount = $amount + ($payment->value->local->amount ?? $payment->net->local->amount ?? 0);
+                    $currency = $payment->value->local->currency ?? $payment->net->local->currency ?? null;
                 }
             }
-            $status = $statuses[strtolower(array_pop($charge->data->timeline)->status ?? 'pending')] ?? 'pending';
-        }
 
+            if (is_null($amount) && isset($charge->data->pricing->local)) {
+                $amount = $charge->data->pricing->local->amount ?? null;
+            }
+
+            if (is_null($currency) && isset($charge->data->pricing->local)) {
+                $currency = $charge->data->pricing->local->currency ?? null;
+            }
+
+            if (is_null($currency) || is_null($amount)) {
+                return null;
+            }
+
+            // Get payment status
+            $last_timeline = end($charge->data->timeline);
+            reset($charge->data->timeline);
+            $status = $statuses[strtolower($last_timeline->status ?? 'PENDING')] ?? $status;
+        } else {
+            return null;
+        }
 
         return [
             'client_id' => ($charge->data->metadata->customer_id ?? null),
