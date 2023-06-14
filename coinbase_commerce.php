@@ -276,7 +276,7 @@ class CoinbaseCommerce extends NonmerchantGateway
         $amount = null;
         $currency = null;
 
-        if (isset($charge->data->payments)) {
+        if (!empty($charge->data->payments)) {
             foreach ($charge->data->payments as $payment) {
                 if (is_null($amount)) {
                     $amount = 0;
@@ -295,7 +295,7 @@ class CoinbaseCommerce extends NonmerchantGateway
             }
 
             if (is_null($currency) || is_null($amount)) {
-                return null;
+                return;
             }
 
             // Get payment status
@@ -306,6 +306,14 @@ class CoinbaseCommerce extends NonmerchantGateway
             if ($amount > 0 && $status == 'error') {
                 $status = 'approved';
             }
+        } else {
+            return;
+        }
+
+        // Validate the webhook contains a valid client id
+        Loader::loadModels($this, ['Clients']);
+        if (!$this->Clients->validateExists($charge->data->metadata->customer_id, 'id', 'clients')) {
+            $success = false;
         }
 
         // Log the response
@@ -367,12 +375,14 @@ class CoinbaseCommerce extends NonmerchantGateway
             'refunded' => 'refunded',
         ];
         $status = 'pending';
+        $success = false;
         if (!empty($charge_id)) {
             $charges = new CoinbaseCommerceCharges($api);
             $charge = $charges->get(['id' => $charge_id])->response();
 
             // Calculate amount
-            if (isset($charge->data->payments)) {
+            if (!empty($charge->data->payments)) {
+                $success = true;
                 foreach ($charge->data->payments as $payment) {
                     if (is_null($amount)) {
                         $amount = 0;
@@ -392,15 +402,17 @@ class CoinbaseCommerce extends NonmerchantGateway
             }
 
             if (is_null($currency) || is_null($amount)) {
-                return null;
+                return;
             }
 
             // Get payment status
             $last_timeline = end($charge->data->timeline);
             reset($charge->data->timeline);
             $status = $statuses[strtolower($last_timeline->status ?? 'PENDING')] ?? $status;
-        } else {
-            return null;
+        }
+
+        if (!$success) {
+            return;
         }
 
         return [
