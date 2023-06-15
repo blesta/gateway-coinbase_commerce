@@ -247,6 +247,18 @@ class CoinbaseCommerce extends NonmerchantGateway
         $api = $this->getApi();
         $charges = new CoinbaseCommerceCharges($api);
 
+        $statuses = [
+            'new' => 'pending',
+            'pending' => 'pending',
+            'unresolved' => 'pending',
+            'resolved' => 'approved',
+            'completed' => 'approved',
+            'pending_refund' => 'approved',
+            'expired' => 'error',
+            'canceled' => 'void',
+            'refunded' => 'refunded',
+        ];
+
         // Fetch signature from webhook
         $signature = $_SERVER['HTTP_X_CC_WEBHOOK_SIGNATURE'] ?? $_SERVER['HTTP_CB_SIGNATURE'] ?? null;
 
