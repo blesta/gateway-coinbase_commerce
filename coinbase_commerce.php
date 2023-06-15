@@ -199,7 +199,7 @@ class CoinbaseCommerce extends NonmerchantGateway
                 'currency' => $currency
             ],
             'metadata' => [
-                'customer_id' => ($contact_info['id'] ?? null),
+                'customer_id' => ($contact_info['client_id'] ?? null),
                 'customer_name' => ($contact_info['first_name'] ?? '') . ' ' . ($contact_info['last_name'] ?? ''),
                 'invoices' => $invoices
             ],
