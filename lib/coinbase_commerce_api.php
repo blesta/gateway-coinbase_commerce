@@ -66,10 +66,13 @@ class CoinbaseCommerceApi
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
+            'Accept: application/json',
             'X-CC-Api-Key: ' . trim($this->api_key),
-            'X-CC-Version: 2018-03-22'
         ]);
 
         if (!empty($args)) {
